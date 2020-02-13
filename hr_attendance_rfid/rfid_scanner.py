@@ -31,13 +31,13 @@ import traceback
 try:
     from queue import Queue, Empty
 except ImportError:
-    from Queue import Queue, Empty 
+    from Queue import Queue, Empty
 import time
 from select import select
 from threading import Thread, Lock
 
 from odoo.addons.hw_proxy.controllers import main as hw_proxy
-from odoo.modules.registry import Registry 
+from odoo.modules.registry import Registry
 
 from os import listdir
 from os.path import join, isdir
@@ -49,6 +49,19 @@ _logger = logging.getLogger(__name__)
 
 scanner_thread = None
 
+class RFID_Devices(models.Model):
+    _name = "rfid.devices"
+    
+    # ~ listDevices = fields.Char(string="Available devices")
+    device_path = fields.Char(string="Path to device")
+    device_name = fields.Char(string="Device name")
+    thread_state = fields.Boolean(string="State")
+
+    
+    
+    
+    # ~ def devices(self):
+        
 
 class RFID_ScannerDevice():
     def __init__(self, path):
@@ -76,13 +89,13 @@ class RFID_Scanner(Thread):
             7: ("6","^"),
             8: ("7","&"),
             9: ("8","*"),
-            10:("9","("), 
-            11:("0",")"), 
-            12:("-","_"), 
-            13:("=","+"), 
+            10:("9","("),
+            11:("0",")"),
+            12:("-","_"),
+            13:("=","+"),
             # 14 BACKSPACE
-            # 15 TAB 
-            16:("q","Q"), 
+            # 15 TAB
+            16:("q","Q"),
             17:("w","W"),
             18:("e","E"),
             19:("r","R"),
@@ -161,8 +174,11 @@ class RFID_Scanner(Thread):
                         or ('barcode' in device.lower()) or ('scanner' in device.lower())]
 
             for device in scanners:
-                _logger.debug('opening device %s', join(self.input_dir,device))
-                self.open_devices.append(RFID_ScannerDevice(join(self.input_dir,device)))
+                # Leo was here
+                # ~ _logger.warn("leowashere %s"%device)
+                if not device == 'usb-Sycreader_RFID_Technology_Co.__Ltd_SYC_ID_IC_USB_Reader_08FF20140315-event-kbd':
+                    _logger.debug('opening device %s', join(self.input_dir,device))
+                    self.open_devices.append(RFID_ScannerDevice(join(self.input_dir,device)))
 
             if self.open_devices:
                 self.set_status('connected','Connected to '+ str([dev.evdev.name for dev in self.open_devices]))
@@ -189,14 +205,14 @@ class RFID_Scanner(Thread):
         while True:
             try:
                 timestamp, barcode = self.barcodes.get(True, 5)
-                if timestamp > time.time() - 5: 
+                if timestamp > time.time() - 5:
                     return barcode
             except Empty:
                 return ''
-    
-    # def get_status(self):
-    #     self.lockedstart()
-    #     return self.status
+
+    def get_status(self):
+        self.lockedstart()
+        return self.status
 
     def _get_open_device_by_fd(self, fd):
         for dev in self.open_devices:
@@ -206,10 +222,10 @@ class RFID_Scanner(Thread):
     def run(self):
         """ This will start a loop that catches all keyboard events, parse barcode
             sequences and put them on a timestamped queue that can be consumed by
-            the point of sale's requests for barcode events 
+            the point of sale's requests for barcode events
         """
         self.barcodes = Queue()
-        
+
         barcode  = []
         shift    = False
         devices  = None
@@ -226,6 +242,7 @@ class RFID_Scanner(Thread):
                     for fd in r:
                         device = self._get_open_device_by_fd(fd)
 
+                        # ~ _logger.warn("leotest %s"%device.evdev.name)
                         if not evdev.util.is_device(device.evdev.fn):
                             _logger.info('%s disconnected', str(device.evdev))
                             self.release_device(device)
@@ -249,7 +266,15 @@ class RFID_Scanner(Thread):
                                         _logger.debug('pushing barcode %s from %s', ''.join(device.barcode), str(device.evdev))
                                         self.barcodes.put( (time.time(),''.join(device.barcode)) )
                                         timestump, test_barcode = self.barcodes.get(True)
-                                        
+
+                                        # Leo was here
+                                        if device.evdev.name == 'ACS ACR1281 Dual Reader':
+                                            hexa_string = test_barcode
+                                            # ~ _logger.warn("leo barcode %s"%hexa_string)
+                                            result = int(hexa_string, 16)
+
+                                            test_barcode = result
+                                            # ~ _logger.warn("leo barcode %s"%test_barcode)
                                         with api.Environment.manage():
                                             # Unclosed cursor might generate exception
                                             try:
@@ -257,15 +282,42 @@ class RFID_Scanner(Thread):
                                                 new_cr.autocommit(True)
                                                 context = {}
                                                 env = api.Environment(new_cr, SUPERUSER_ID, context)
-                                                env['zwave.homeassistant'].lock_operation(test_barcode)
 
+                                                match = env['hr.employee'].search([('barcode', '=', test_barcode)])
+
+                                                if match:
+                                                    network = ''
+                                                    # choose what method to run here. Possible?
+                                                    if not env['zwave.network'].search([]):
+                                                        network = env['zwave.network'].create({})
+                                                    else:
+                                                        network = env['zwave.network'].search([], limit=1)
+
+                                                    if network.state() != 10:
+                                                        network.start()
+
+                                                    if not env['zwave.node'].search([]):
+                                                        _logger.info("Mapping nodes")
+                                                        network.map_nodes()
+                                                    lock = env['zwave.node'].search([('node_id', '=', 2)], limit=1)
+
+                                                    if lock:
+                                                        state = lock.get_locked_status()
+                                                        _logger.info("Lock state: %s"%state)
+                                                        # if state == True:
+                                                        lock.unlock()
+                                                else:
+                                                    _logger.info("BARCODE DOES NOT MATCH")
+                                                # # elif state == False:
+                                                # #     lock.lock()
+                                                
                                             except Exception as e:
                                                 _logger.warn(traceback.format_exc())
                                                 self.set_status('Enviroment error',str(e))
                                             finally:
                                                 new_cr.close()
-                                            
-                                            
+
+
 
                                         device.barcode = []
                                 elif event.value == 0: #keyup events
@@ -277,12 +329,12 @@ class RFID_Scanner(Thread):
                 _logger.warn(traceback.format_exc())
                 self.set_status('error',str(e))
 
-
-
 if evdev:
     scanner_thread = RFID_Scanner()
     hw_proxy.drivers['rfid'] = scanner_thread
     scanner_thread.lockedstart()
+
+
 
 # class ScannerDriver(hw_proxy.Proxy):
 #     @http.route('/hw_proxy/scanner', type='json', auth='none', cors='*')

@@ -20,9 +20,9 @@
 ##############################################################################
 
 {
-    'name': 'Attendance Z-Wave Handler',
+    'name': 'Z-Wave Handler',
     'version': '12.0.1',
-    'category': 'hr',
+    'category': 'hw',
     'description': """
         
 
@@ -32,7 +32,7 @@
     'license': 'AGPL-3',
     'website': 'http://www.vertel.se',
     'depends': ['hr_attendance'],
-    'data': [],
+    'data': ['security/ir.model.access.csv', 'views/zwave_views.xml'],
     'installable': True,
 }
 # vim:expandtab:smartindent:tabstop=4s:softtabstop=4:shiftwidth=4:

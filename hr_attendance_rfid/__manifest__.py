@@ -31,8 +31,8 @@
     'author': 'Vertel AB',
     'license': 'AGPL-3',
     'website': 'http://www.vertel.se',
-    'depends': ['hr_attendance'],
-    'data': [],
+    'depends': ['hr_attendance', 'hw_attendance_zwave'],
+    'data': ['security/ir.model.access.csv', 'views/devices_view.xml'],
     'installable': True,
 }
 # vim:expandtab:smartindent:tabstop=4s:softtabstop=4:shiftwidth=4:
