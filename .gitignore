@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Openzwave configuration
+hr_attendance_zwave/ozw_log/

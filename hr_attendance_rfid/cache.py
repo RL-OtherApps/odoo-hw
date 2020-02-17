@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #    OpenERP, Open Source Management Solution, third party addon
-#    Copyright (C) 2019- Vertel AB (<http://vertel.se>).
+#    Copyright (C) 2019 Vertel AB (<http://vertel.se>).
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as
@@ -18,22 +18,22 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+from odoo import models, fields, api, _
+from odoo.exceptions import except_orm, Warning, RedirectWarning
+from odoo import http
+from odoo.http import request
+from odoo import SUPERUSER_ID
+import logging
+import odoo
 
-{
-    'name': 'Attendance HW Barcode',
-    'version': '12.0.1',
-    'category': 'hr',
-    'description': """
+import traceback
+import erppeek
+import time
+
+_logger = logging.getLogger(__name__)
 
 
-""",
-    'images': ['static/description/img.png'],
-    'author': 'Vertel AB',
-    'license': 'AGPL-3',
-    'website': 'http://www.vertel.se',
-    'depends': ['hr_attendance', 'bus'],
-    'data': ['hr_attendance_view.xml',
-    ],
-    'installable': True,
-}
-# vim:expandtab:smartindent:tabstop=4s:softtabstop=4:shiftwidth=4:
+# class cache(models.TransientModel):
+	# _name = 'hr.cache'
+
+	

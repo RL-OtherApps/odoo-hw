@@ -30,12 +30,6 @@ import time
 import requests
 
 
-
-#logging.getLogger('openzwave').addHandler(logging.NullHandler())
-#logging.basicConfig(level=logging.DEBUG)
-
-# logger = logging.getLogger('openzwave')
-
 _logger = logging.getLogger(__name__)
 
 # CHECK IF OPENZWAVE IS INSTALLED. ELSE THROW EXCEPTION
@@ -55,83 +49,59 @@ else:
 
 
 
-# for arg in sys.argv:
-#     if arg.startswith("--device"):
-#         temp,device = arg.split("=")
-#     elif arg.startswith("--log"):
-#         temp,log = arg.split("=")
-#     elif arg.startswith("--sniff"):
-#         temp,sniff = arg.split("=")
-#         sniff = float(sniff)
-#     elif arg.startswith("--help"):
-#         _logger.info("help : ")
-#         _logger.info("  --device=/dev/yourdevice ")
-#         _logger.info("  --log=Info|Debug")
-
-
-
-
-
-
 config_path = config.get('zwave_config_path', '/usr/local/lib/python3.6/dist-packages/python_openzwave/ozw_config')
 user_path = config.get('zwave_user_path', '/usr/share/odoo-hw/hw_attendance_zwave/ozw_log')
 
 
 # configure these in config?
-device="/dev/ttyACM0"
+# Make a udev rule that switches the name of ur stick to zwavecontroller
+device="/dev/zwavecontroller"
 log="Always"
 sniff=300.0
 
+try:
+    options = ZWaveOption(device, \
+      config_path=config_path, \
+      user_path=user_path, cmd_line="")
+    options.set_log_file("OZW_Log.log")
+    options.set_append_log_file(True)
+    options.set_console_output(False)
+    options.set_save_log_level(log)
+    options.set_logging(True)
+    options.lock()
 
-options = ZWaveOption(device, \
-  config_path=config_path, \
-  user_path=user_path, cmd_line="")
-options.set_log_file("OZW_Log.log")
-options.set_append_log_file(True)
-options.set_console_output(False)
-options.set_save_log_level(log)
-options.set_logging(True)
-options.lock()
-
-#Create a network object
-_logger.info("Carl user_path: %s"%config_path)
-network = ZWaveNetwork(options, autostart=False)
+    #Create a network object
+    network = ZWaveNetwork(options, autostart=False)
 
 
-def notification_catcher(*args, **kw):
-    # _logger.info(args)
-    _logger.info("Carl Z-Wave Notification: %s"%str(kw))
+    def notification_catcher(*args, **kw):
+        # _logger.info(args)
+        _logger.info("Z-Wave Notification: %s"%str(kw))
 
-#We connect to the louie dispatcher
-dispatcher.connect(notification_catcher)
+    #We connect to the louie dispatcher
+    dispatcher.connect(notification_catcher)
 
-# def all nodes_queried(**kw):
-#     return break
+    # def all nodes_queried(**kw):
+    #     return break
 
-network.start()
-
+    network.start()
+except:
+    _logger.warn("Z-wave configuration failed. Check if Z-Stick is connected properly")
 
 
 
 class zwave_network(models.Model):
     _name = 'zwave.network'
 
-    device = fields.Char(string="Controller path", default="/dev/ttyACM0")
+    device = fields.Char(string="Controller path", default="/dev/zwavecontroller")
     # change to selection
+    # node_type = fields.Selection([('controller', 'A network controller'),('lock', 'A secure node'), ('undeclared', 'An undeclared node')])
     log = fields.Char(string="Logging enabled", default="Always")
     sniff = fields.Float(string="sniff", default=300.0)
     home_id = fields.Char(string="Home network ID", compute="get_home_id")
     node_ids = fields.One2many('zwave.node', 'network_id', string="Nodes on the network")
 
 
-    # def notification_catcher(*args, **kw):
-    #     # _logger.info(args)
-    #     _logger.info("Carl Z-Wave Notification: %s"%str(kw))
-
-    # #We connect to the louie dispatcher
-    # dispatcher.connect(notification_catcher)
-
-    # displays the dispatcher notifications
 
     # While doing this the node to connect must be in inclusion mode and the network key must be set in options.xml
     @api.multi
@@ -140,20 +110,22 @@ class zwave_network(models.Model):
 
     @api.multi
     def add_secure_node(self):
-        _logger.info("Trying to connect a secure node to network...")
         try:
             node_state = network.controller.add_node(doSecurity=True)
+            _logger.info("Trying to connect a secure node to network...")
             # if ZWaveNetwork.SIGNAL_NODE.name
         except:
             _logger.info("something went wrong")
 
     @api.multi
     def remove_node(self):
-        _logger.info("Trying to remove a node from network...")
+        # catch notification to display node removal
         try:
             danalock_state = network.controller.remove_node()
+            _logger.info("Trying to remove a node from network...")
         except:
             _logger.info("something went wrong")
+
         _logger.info("{} nodes were found.".format(network.nodes_count))
 
     @api.model
@@ -192,7 +164,7 @@ class zwave_network(models.Model):
         if self.state() != 10 or self.state() != 7:
             network.start()
             _logger.info("***** Waiting for z-wave network to become ready : ")
-            for i in range(0,90):
+            for i in range(0,60):
                 if network.state>=network.STATE_READY:
                     _logger.info("***** Network is ready")
                     break
@@ -216,8 +188,10 @@ class zwave_network(models.Model):
 
     @api.multi
     def map_nodes(self):
+        self.list_nodes()
         for node in network.nodes:
             _node = network.nodes[node]
+
             node_type = ''
             if 'lock' in _node.type.lower():
                 node_type = 'lock'
@@ -227,8 +201,9 @@ class zwave_network(models.Model):
                 node_type = 'undeclared'
 
 
+            # else add node to network relation
             if not self.env['zwave.node'].search([('node_id', '=', node)]):
-
+                _logger.info("Mapping node")
                 self.env['zwave.node'].create({
                     'node_id':node,
                     'name':_node.product_name,
