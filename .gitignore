@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 
 # Openzwave configuration
-hr_attendance_zwave/ozw_log/
+hw_zwave/ozw_log/
