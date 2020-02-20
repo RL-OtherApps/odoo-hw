@@ -47,10 +47,12 @@ if six.PY3:
 else:
     from louie import dispatcher
 
+import traceback
+
 
 
 config_path = config.get('zwave_config_path', '/usr/local/lib/python3.6/dist-packages/python_openzwave/ozw_config')
-user_path = config.get('zwave_user_path', '/usr/share/odoo-hw/hw_attendance_zwave/ozw_log')
+user_path = config.get('zwave_user_path', '/usr/share/odoo-hw/hw_zwave/ozw_log')
 
 
 # configure these in config?
@@ -59,6 +61,7 @@ device="/dev/zwavecontroller"
 log="Always"
 sniff=300.0
 
+# TODO: Make configurable, perhaps by the config file.
 try:
     options = ZWaveOption(device, \
       config_path=config_path, \
@@ -86,37 +89,35 @@ try:
 
     network.start()
 except:
-    _logger.warn("Z-wave configuration failed. Check if Z-Stick is connected properly")
-
+    _logger.warn("Z-wave configuration failed. Check if Z-Stick is connected properly \n %s"%traceback.format_exc())
 
 
 class zwave_network(models.Model):
     _name = 'zwave.network'
 
-    device = fields.Char(string="Controller path", default="/dev/zwavecontroller")
-    # change to selection
-    # node_type = fields.Selection([('controller', 'A network controller'),('lock', 'A secure node'), ('undeclared', 'An undeclared node')])
-    log = fields.Char(string="Logging enabled", default="Always")
-    sniff = fields.Float(string="sniff", default=300.0)
-    home_id = fields.Char(string="Home network ID", compute="get_home_id")
+    name = fields.Char(string="Name")
+    # device = fields.Char(string="Controller path", default="/dev/zwavecontroller")
+    # log = fields.Char(string="Logging enabled", default="Always")
+    # sniff = fields.Float(string="sniff", default=300.0)
+    home_id = fields.Char(string="Home network ID", compute="_compute_home_id")
     node_ids = fields.One2many('zwave.node', 'network_id', string="Nodes on the network")
 
 
 
-    # While doing this the node to connect must be in inclusion mode and the network key must be set in options.xml
-    @api.multi
-    def get_home_id(self):
-        return network.home_id
+    @api.depends
+    def _compute_home_id(self):
+        self.home_id = network.home_id
 
+    # While doing this the node to connect must be in inclusion mode and the network key must be set in options.xml
     @api.multi
     def add_secure_node(self):
         try:
             node_state = network.controller.add_node(doSecurity=True)
             _logger.info("Trying to connect a secure node to network...")
-            # if ZWaveNetwork.SIGNAL_NODE.name
         except:
             _logger.info("something went wrong")
 
+    # Sets the controller in exclusion mode. The node to connect must be set to its exclusion mode.
     @api.multi
     def remove_node(self):
         # catch notification to display node removal
@@ -125,8 +126,6 @@ class zwave_network(models.Model):
             _logger.info("Trying to remove a node from network...")
         except:
             _logger.info("something went wrong")
-
-        _logger.info("{} nodes were found.".format(network.nodes_count))
 
     @api.model
     def get_network(self):
@@ -140,7 +139,7 @@ class zwave_network(models.Model):
     @api.model
     def state(self):
         return network.state
-    
+
     @api.multi
     def alert_state(self):
         message = 'No response'
@@ -177,15 +176,16 @@ class zwave_network(models.Model):
 
         #verify that it starts?
 
-
     @api.multi
     def stop(self):
         network.stop()
         # Verify that it stops?
 
+
     def list_nodes(self):
         _logger.info("Carl Nodes on network: %s"%str(network.nodes))
 
+    # Creates a node object in odoo for each node on the network
     @api.multi
     def map_nodes(self):
         self.list_nodes()
@@ -220,71 +220,75 @@ class zwave_node(models.Model):
     name = fields.Char(string="Node name", required=True)
     node_type = fields.Selection([('controller', 'A network controller'),('lock', 'A secure node'), ('undeclared', 'An undeclared node')])
     network_id = fields.Many2one('zwave.network', string="Network associated to node")
+ 
 
-
-    lock_value = fields.Integer(string='The ZWaveValue ID', compute='get_doorlock_value')
-    # time is an integer where 0 == no autolock and 1 - 2147483647
-    lock_delay = fields.Integer(string='Delay before locking', default='10')
-
-
-    @api.depends('node_id')
-    def get_doorlock_value(self):
-        lock_values = network.nodes[self.node_id].get_doorlocks()
-        for val, value_object in lock_values.items():
-            _logger.info("Returning value: %s"%val)
-            self.lock_value = val
-
-    @api.model
-    def get_locked_status(self):
-        locks = network.nodes[self.node_id].get_doorlocks()
-        for val, value_object in locks.items():
-            return value_object.data
-
-    @api.multi
-    def alert_autolock(self):
-        lock = self.get_node()
-        autolock_value = lock.get_values(label='Autolock')
-        for val, value_object in autolock_value.items():
-            raise Warning(value_object.data)
-
-    @api.multi
-    def get_autolock(self):
-        lock = self.get_node()
-        autolock_value = lock.get_values(label='Autolock')
-        for val, value_object in autolock_value.items():
-            return value_object
-
-    # time is an integer where 0 == no autolock and 1 - 2147483647
-    @api.multi
-    def set_autolock(self):
-        lock_delay = time or self.lock_delay
-        autolock = self.get_autolock()
-        autolock.data = self.lock_delay
-        autolock.refresh()
-
-    @api.multi
-    def alert_state(self):
-        locks = network.nodes[self.node_id].get_doorlocks()
-        for val, value_object in locks.items():
-            raise Warning(value_object.data)
+    # lock_value = fields.Integer(string='The ZWaveValue ID', compute='get_doorlock_value')
+    # # time is an integer where 0 == no autolock and 1 - 2147483647
+    # lock_delay = fields.Integer(string='Delay before locking', default='10')
 
     @api.model
     def get_node(self):
         _logger.info("Returning Node: %s"%network.nodes[self.node_id])
         return network.nodes[self.node_id]
+    
+    
+    # # Lock values:
+    
+    # # Returns the value associated with the LOCK
+    # @api.depends('node_id')
+    # def get_doorlock_value(self):
+    #     lock_values = network.nodes[self.node_id].get_doorlocks()
+    #     for val, value_object in lock_values.items():
+    #         # _logger.info("Returning value: %s"%val)
+    #         self.lock_value = val
 
-    @api.multi
-    def lock(self):
+    # @api.model
+    # def get_locked_status(self):
+    #     locks = network.nodes[self.node_id].get_doorlocks()
+    #     for val, value_object in locks.items():
+    #         return value_object.data
 
-        lock = self.get_node()
-        # Setting lock to True = locked
-        lock.set_doorlock(self.lock_value, True)
+    # @api.multi
+    # def alert_autolock(self):
+    #     lock = self.get_node()
+    #     autolock_value = lock.get_values(label='Autolock')
+    #     for val, value_object in autolock_value.items():
+    #         raise Warning(value_object.data)
 
-    @api.multi
-    def unlock(self):
-        # value = self.get_doorlock_value()
-        lock = self.get_node()
-        # Setting lock to False = unlocked
-        lock.set_doorlock(self.lock_value, False)
+    # @api.multi
+    # def get_autolock(self):
+    #     lock = self.get_node()
+    #     autolock_value = lock.get_values(label='Autolock')
+    #     for val, value_object in autolock_value.items():
+    #         return value_object
+
+    # @api.multi
+    # def set_autolock(self):
+    #     # time is an integer where 0 == no autolock and 1 - 2147483647
+    #     lock_delay = time or self.lock_delay
+    #     autolock = self.get_autolock()
+    #     autolock.data = self.lock_delay
+    #     autolock.refresh()
+
+    # @api.multi
+    # def alert_state(self):
+    #     locks = network.nodes[self.node_id].get_doorlocks()
+    #     for val, value_object in locks.items():
+    #         raise Warning(value_object.data)
+
+
+    # @api.multi
+    # def lock(self):
+
+    #     lock = self.get_node()
+    #     # Setting lock to True = locked
+    #     lock.set_doorlock(self.lock_value, True)
+
+    # @api.multi
+    # def unlock(self):
+    #     # value = self.get_doorlock_value()
+    #     lock = self.get_node()
+    #     # Setting lock to False = unlocked
+    #     lock.set_doorlock(self.lock_value, False)
 
 

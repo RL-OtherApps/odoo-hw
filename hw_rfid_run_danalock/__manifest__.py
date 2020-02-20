@@ -20,19 +20,18 @@
 ##############################################################################
 
 {
-    'name': 'Z-Wave Handler',
+    'name': 'Zwave lock RFID loop',
     'version': '12.0.1',
-    'category': 'hw',
+    'category': 'hr',
     'description': """
-        
-
+        Adds zwave danalock V3 unlocking from the loop.
 """,
-    'images': ['static/description/img.png'],
+    'images': [],
     'author': 'Vertel AB',
     'license': 'AGPL-3',
     'website': 'http://www.vertel.se',
-    'depends': ['hr_attendance'],
-    'data': ['security/ir.model.access.csv', 'views/zwave_views.xml'],
+    'depends': ['hw_rfid_scanner', 'hw_zwave'],
+    'data': [],
     'installable': True,
 }
 # vim:expandtab:smartindent:tabstop=4s:softtabstop=4:shiftwidth=4:

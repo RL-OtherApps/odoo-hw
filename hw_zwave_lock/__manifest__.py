@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #    OpenERP, Open Source Management Solution, third party addon
-#    Copyright (C) 2019 Vertel AB (<http://vertel.se>).
+#    Copyright (C) 2019- Vertel AB (<http://vertel.se>).
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as
@@ -18,22 +18,22 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-from odoo import models, fields, api, _
-from odoo.exceptions import except_orm, Warning, RedirectWarning
-from odoo import http
-from odoo.http import request
-from odoo import SUPERUSER_ID
-import logging
-import odoo
 
-import traceback
-import erppeek
-import time
+{
+    'name': 'Z-Wave Locks',
+    'version': '12.0.1',
+    'category': 'hw',
+    'description': """
+        A module handling zwave locks. Built on the openzwave library.
+        Adds a lock-node view as xpath and some fields + methods for Z-Wave lock handling.
 
-_logger = logging.getLogger(__name__)
-
-
-# class cache(models.TransientModel):
-	# _name = 'hr.cache'
-
-	
+""",
+    'images': [],
+    'author': 'Vertel AB',
+    'license': 'AGPL-3',
+    'website': 'http://www.vertel.se',
+    'depends': ['hw_zwave'],
+    'data': ['views/zwave_lock_views.xml'],
+    'installable': True,
+}
+# vim:expandtab:smartindent:tabstop=4s:softtabstop=4:shiftwidth=4:

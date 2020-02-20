@@ -20,18 +20,21 @@
 ##############################################################################
 
 {
-    'name': 'Attendance Rfid Handler',
+    'name': 'Rfid Threading Handler',
     'version': '12.0.1',
     'category': 'hr',
     'description': """
-
+        Handles threading and input of RFID-Devices. Overrides hw_scanner.
+        Lets you input which devices to thread and not to thread as a system parameter. 
+        Uses decimal input as a standard check value. Therefore:
+        Lets you input which devices to convert from hexadecimal input to decimal input as a system parameter. 
 
 """,
-    'images': ['static/description/img.png'],
+    'images': [],
     'author': 'Vertel AB',
     'license': 'AGPL-3',
     'website': 'http://www.vertel.se',
-    'depends': ['hr_attendance', 'hw_attendance_zwave'],
+    'depends': ['hr_attendance', 'hw_zwave'],
     'data': ['security/ir.model.access.csv', 'views/devices_view.xml'],
     'installable': True,
 }

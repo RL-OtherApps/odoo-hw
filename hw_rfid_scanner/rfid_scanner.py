@@ -20,6 +20,7 @@
 ##############################################################################
 from odoo import models, fields, api, _
 from odoo.exceptions import except_orm, Warning, RedirectWarning
+from odoo.tools.config import config
 from odoo import http
 from odoo.http import request
 from odoo import SUPERUSER_ID
@@ -149,6 +150,19 @@ class RFID_Scanner(Thread):
             57:(" "," "),
         }
 
+    def get_env(self):
+        db = config.get('rfid_database')
+        if not db:
+            db = odoo.service.db.list_dbs()
+            db = db and db[0] or ''
+
+        cursor = Registry(db).cursor()
+
+        cursor.autocommit(True)
+        context = {}
+        return api.Environment(cursor, SUPERUSER_ID, context)
+
+
     def lockedstart(self):
         with self.lock:
             if not self.isAlive():
@@ -188,9 +202,21 @@ class RFID_Scanner(Thread):
             for device in scanners:
 
                 # does not pick upp the named device
-                if not device == 'usb-Sycreader_RFID_Technology_Co.__Ltd_SYC_ID_IC_USB_Reader_08FF20140315-event-kbd':
-                    _logger.debug('opening device %s', join(self.input_dir,device))
-                    self.open_devices.append(RFID_ScannerDevice(join(self.input_dir,device)))
+                
+                with api.Environment.manage():
+                    try:
+                        env = self.get_env()
+                        banned_devices = env['ir.config_parameter'].get_param('rfid_scanner.banned_devices')
+                        if device not in banned_devices:
+                            _logger.debug('opening device %s', join(self.input_dir,device))
+                            self.open_devices.append(RFID_ScannerDevice(join(self.input_dir,device)))
+
+                    except Exception as e:
+                        _logger.warn(traceback.format_exc())
+                        self.set_status('Enviroment error',str(e))
+                    finally:
+                        env.cr.close()
+
 
             if self.open_devices:
                 self.set_status('connected','Connected to '+ str([dev.evdev.name for dev in self.open_devices]))
@@ -269,28 +295,24 @@ class RFID_Scanner(Thread):
                                         self.barcodes.put( (time.time(),''.join(device.barcode)) )
                                         timestump, input_barcode = self.barcodes.get(True)
 
-                                        # Converts input to decimal from hexadecimal for readers added.
-                                        if device.evdev.name == 'ACS ACR1281 Dual Reader':
-                                            hexa_string = input_barcode
-                                            result = int(hexa_string, 16)
-                                            input_barcode = result
 
                                         with api.Environment.manage():
                                             try:
+                                                env = self.get_env()
 
-                                                # Systemparameter?
-                                                new_cr = Registry('Inpassering-ex-jobb').cursor()
-                                                new_cr.autocommit(True)
-                                                context = {}
-                                                env = api.Environment(new_cr, SUPERUSER_ID, context)
-
+                                                hexadecimal_devices = env['ir.config_parameter'].get_param('rfid_scanner.hexadecimal_devices')
+                                                # Converts input to decimal from hexadecimal for readers added.
+                                                if device.evdev.name in hexadecimal_devices:
+                                                    hexa_string = input_barcode
+                                                    result = int(hexa_string, 16)
+                                                    input_barcode = result
                                                 env['rfid.run'].run(input_barcode)
                                                 
                                             except Exception as e:
                                                 _logger.warn(traceback.format_exc())
                                                 self.set_status('Enviroment error',str(e))
                                             finally:
-                                                new_cr.close()
+                                                env.cr.close()
 
 
 

@@ -20,10 +20,9 @@
                     <group string="Zwave Network" col="4">
 
                         <group string="Information" colspan="2">
-                                <field name="device"/>
-                                <field name="log"/>
-                                <field name="sniff"/>
+                                <field name="name"/>
                         </group>
+
                         <group string="Identification" colspan="2">
                             <field name="home_id"/>
                         </group>
@@ -40,15 +39,7 @@
             <field name="arch" type="xml">
                 <form>
                     <sheet>
-                        <header attrs="{'invisible':[('node_type', '!=', 'lock')]}">
-                            <button name="alert_state" string="Locked state" type="object" class="oe_highlight"  />
-                            <button name="lock" string="Lock" type="object" class="oe_highlight" confirm="Lock the lock?"/>
-                            <button name="unlock" string="Unlock" type="object" class="oe_highlight" confirm="Unlock the lock?"/>
-                            <button name="alert_autolock" string="Autolock value" type="object" class="oe_highlight"/>
-                            <button name="set_autolock" string="Set autolock" type="object" class="oe_highlight"/>
-
-                        </header>
-                        <group string="Zwave Node" col="4">
+                        <group id="zwave_node_group" string="Zwave Node" col="4">
 
                             <group string="Information" colspan="2">
                                     <field name="name"/>
@@ -58,11 +49,6 @@
                                 <field name="node_id"/>
                                 <field name="network_id"/>
                             </group>
-                            <group string="Lock Information" attrs="{'invisible':[('node_type', '!=', 'lock')]}">
-                                <field name="lock_delay"/>
-                                <field name="lock_value"/>
-                            </group>
-
                         </group>
                     </sheet>
                 </form>
@@ -74,9 +60,7 @@
         <field name="model">zwave.network</field>
         <field name="arch" type="xml">
             <tree>
-                <field name="device"/>
-                <field name="log"/>
-                <!-- <field name="sniff"/> -->
+                <field name="name"/>
                 <field name="home_id"/>
                 <field name="node_ids"/>
 
